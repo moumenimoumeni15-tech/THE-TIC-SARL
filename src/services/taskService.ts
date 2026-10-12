@@ -67,6 +67,14 @@ export async function getAllTaches(): Promise<{ data: Tache[]; error: string | n
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       console.warn('Erreur lors de la récupération des tâches:', errorMsg);
+      if (
+        errorMsg.includes('Could not find the table') ||
+        errorMsg.includes('does not exist') ||
+        errorMsg.includes('42P01')
+      ) {
+        const localTasks = getLocalFallbackTaches();
+        return { data: localTasks, error: null, isSupabase: false };
+      }
       return { data: [], error: errorMsg, isSupabase: true };
     }
   }
@@ -103,6 +111,21 @@ export async function createTache(
       return { data, error: null };
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : String(err);
+      if (
+        errorMsg.includes('Could not find the table') ||
+        errorMsg.includes('does not exist') ||
+        errorMsg.includes('42P01')
+      ) {
+        const newTache: Tache = {
+          ...tacheData,
+          id: `local-task-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        const list = getLocalFallbackTaches();
+        saveLocalFallbackTaches([newTache, ...list]);
+        return { data: newTache, error: null };
+      }
       return { data: null, error: errorMsg };
     }
   }

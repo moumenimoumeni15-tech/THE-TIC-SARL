@@ -61,7 +61,22 @@ export async function getRapports(): Promise<{ data: RapportWithTachesStats[]; e
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       console.warn('Erreur lors de la récupération des rapports:', errorMsg);
-      // Retourner l'erreur pour informer l'utilisateur
+
+      // Si les tables ne sont pas encore créées sur la base distante, basculer en mode local transparent
+      if (
+        errorMsg.includes('Could not find the table') ||
+        errorMsg.includes('does not exist') ||
+        errorMsg.includes('42P01')
+      ) {
+        const localRapports = getLocalFallbackRapports();
+        const localStats: RapportWithTachesStats[] = localRapports.map((r) => ({
+          ...r,
+          total_taches: 0,
+          taches_terminees: 0,
+        }));
+        return { data: localStats, error: null, isSupabase: false };
+      }
+
       return { data: [], error: errorMsg, isSupabase: true };
     }
   }
@@ -145,6 +160,22 @@ export async function createRapport(
       return { data, error: null };
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : String(err);
+      if (
+        errorMsg.includes('Could not find the table') ||
+        errorMsg.includes('does not exist') ||
+        errorMsg.includes('42P01')
+      ) {
+        const newRapport: Rapport = {
+          ...rapportData,
+          id: `local-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          taches: [],
+        };
+        const list = getLocalFallbackRapports();
+        saveLocalFallbackRapports([newRapport, ...list]);
+        return { data: newRapport, error: null };
+      }
       return { data: null, error: errorMsg };
     }
   }
