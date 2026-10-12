@@ -1,0 +1,6 @@
+{
+  "name": "DailyReport Manager",
+  "description": "Application web professionnelle de gestion des rapports journaliers et des tâches avec Supabase PostgreSQL, statistiques et graphiques analytiques.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
