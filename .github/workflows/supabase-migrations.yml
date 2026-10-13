@@ -1,0 +1,25 @@
+
+name: Supabase Database Migrations
+
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Validate migration files
+        run: |
+          if [ ! -d supabase/migrations ]; then
+            echo "Le dossier supabase/migrations est introuvable."
+            exit 1
+          fi
+          echo "Dossier des migrations détecté."
