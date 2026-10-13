@@ -90,22 +90,29 @@ export function clearSupabaseCredentials(): void {
   }
 }
 
-// Vérifier la connexion avec la base de données
-export async function testSupabaseConnection(overrideUrl?: string, overrideKey?: string): Promise<{
+export interface DatabaseDiagnostics {
   success: boolean;
+  status: 'connected' | 'missing_tables' | 'auth_error' | 'network_error' | 'not_configured';
   message: string;
+  url: string;
   tableRapportsOk?: boolean;
   tableTachesOk?: boolean;
-}> {
+  rawError?: string;
+}
+
+// Vérifier la connexion avec la base de données
+export async function testSupabaseConnection(overrideUrl?: string, overrideKey?: string): Promise<DatabaseDiagnostics> {
   try {
     const creds = getSupabaseCredentials();
-    const url = overrideUrl || creds.url;
-    const key = overrideKey || creds.anonKey;
+    const url = overrideUrl ? sanitizeSupabaseUrl(overrideUrl) : creds.url;
+    const key = overrideKey ? overrideKey.trim() : creds.anonKey;
 
     if (!url || !key) {
       return {
         success: false,
-        message: 'URL et clé d\'accès à la base de données non renseignées.',
+        status: 'not_configured',
+        url: url || '',
+        message: 'URL ou clé d\'accès au serveur non renseignée.',
       };
     }
 
@@ -118,17 +125,52 @@ export async function testSupabaseConnection(overrideUrl?: string, overrideKey?:
       .limit(1);
 
     if (errRapports) {
-      if (errRapports.code === '42P01' || errRapports.message?.includes('does not exist')) {
+      const errMsg = errRapports.message || '';
+      const isMissingTable =
+        errRapports.code === '42P01' ||
+        errMsg.includes('does not exist') ||
+        errMsg.includes('Could not find the table') ||
+        errMsg.includes('schema cache');
+
+      const isAuthError =
+        errRapports.code === 'PGRST301' ||
+        errMsg.toLowerCase().includes('jwt') ||
+        errMsg.toLowerCase().includes('apikey') ||
+        errMsg.toLowerCase().includes('unauthorized') ||
+        errMsg.toLowerCase().includes('permission denied');
+
+      if (isMissingTable) {
         return {
           success: false,
-          message: 'Connecté au serveur de base de données, mais la table "rapports" n\'est pas encore créée. Le script d\'initialisation est disponible dans l\'onglet Paramètres.',
+          status: 'missing_tables',
+          url,
+          message: 'Serveur connecté, mais la table "rapports" n\'est pas encore créée dans la base de données.',
           tableRapportsOk: false,
           tableTachesOk: false,
+          rawError: errMsg,
         };
       }
+
+      if (isAuthError) {
+        return {
+          success: false,
+          status: 'auth_error',
+          url,
+          message: `Échec d'authentification : Clé d'accès refusée par le serveur (${errMsg})`,
+          tableRapportsOk: false,
+          tableTachesOk: false,
+          rawError: errMsg,
+        };
+      }
+
       return {
         success: false,
-        message: `Erreur de communication : ${errRapports.message} (code: ${errRapports.code || 'inconnu'})`,
+        status: 'network_error',
+        url,
+        message: `Erreur de communication : ${errMsg} (code: ${errRapports.code || 'inconnu'})`,
+        tableRapportsOk: false,
+        tableTachesOk: false,
+        rawError: errMsg,
       };
     }
 
@@ -141,23 +183,32 @@ export async function testSupabaseConnection(overrideUrl?: string, overrideKey?:
     if (errTaches) {
       return {
         success: false,
+        status: 'missing_tables',
+        url,
         message: 'Table "rapports" accessible, mais la table "taches" n\'est pas encore créée.',
         tableRapportsOk: true,
         tableTachesOk: false,
+        rawError: errTaches.message,
       };
     }
 
     return {
       success: true,
+      status: 'connected',
+      url,
       message: 'Connexion à la base de données réussie ! Les tables "rapports" et "taches" sont prêtes.',
       tableRapportsOk: true,
       tableTachesOk: true,
     };
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : String(err);
+    const creds = getSupabaseCredentials();
     return {
       success: false,
+      status: 'network_error',
+      url: creds.url,
       message: `Erreur inattendue de connexion : ${errorMsg}`,
+      rawError: errorMsg,
     };
   }
 }

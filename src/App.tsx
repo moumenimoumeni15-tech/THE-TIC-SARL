@@ -16,6 +16,7 @@ import { getRapports } from './services/reportService';
 import { getAllTaches } from './services/taskService';
 import { getSupabaseCredentials } from './lib/supabase';
 import { autoInitializeDatabase } from './lib/databaseInit';
+import { DatabaseStatusBanner } from './components/DatabaseStatusBanner';
 import { Loader2 } from 'lucide-react';
 
 function MainApp() {
@@ -114,6 +115,9 @@ function MainApp() {
           onNewReportClick={handleHeaderNewReport}
           onOpenAuthModal={() => setIsAuthModalOpen(true)}
         />
+
+        {/* Diagnostic et avertissements base de données */}
+        <DatabaseStatusBanner />
 
         {/* Corps de la page */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
