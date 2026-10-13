@@ -16,10 +16,16 @@ jobs:
         with:
           version: latest
 
-      - name: Validate migration files
+      - name: Check migration files
         run: |
           if [ ! -d supabase/migrations ]; then
             echo "Le dossier supabase/migrations est introuvable."
             exit 1
           fi
-          echo "Dossier des migrations détecté."
+
+          if ! find supabase/migrations -maxdepth 1 -type f -name '*.sql' | grep -q .; then
+            echo "Aucun fichier SQL de migration trouvé."
+            exit 1
+          fi
+
+          echo "Les fichiers SQL de migration sont présents."
