@@ -3,10 +3,16 @@ name: Supabase Database Migrations
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'supabase/migrations/**'
 
 jobs:
   migrate:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -16,16 +22,17 @@ jobs:
         with:
           version: latest
 
-      - name: Check migration files
+      - name: Verify migration files
         run: |
-          if [ ! -d supabase/migrations ]; then
-            echo "Le dossier supabase/migrations est introuvable."
-            exit 1
-          fi
-
           if ! find supabase/migrations -maxdepth 1 -type f -name '*.sql' | grep -q .; then
             echo "Aucun fichier SQL de migration trouvé."
             exit 1
           fi
+          echo "Fichiers de migration détectés."
 
-          echo "Les fichiers SQL de migration sont présents."
+      - name: Apply database migrations
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          supabase migration list --db-url "$SUPABASE_DB_URL"
+          supabase db push --db-url "$SUPABASE_DB_URL"
